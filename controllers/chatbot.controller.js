@@ -24,23 +24,10 @@ const handleIncomingMessage = async (req, res) => {
     const number = req.body && (req.body.sender || req.body.phone || req.body.from || req.body.pengirim);
     const message = req.body && (req.body.pesan || req.body.message || req.body.text || null);
 
-    // detect image fields (several provider shapes)
-    let image = req.body && (req.body.image || req.body.file || req.body.media || req.body.mediaUrl || req.body.fileUrl || req.body.url || null);
-    if (!image && req.body && req.body.attachments && Array.isArray(req.body.attachments) && req.body.attachments[0] && req.body.attachments[0].url) {
-      image = req.body.attachments[0].url;
-    }
-    if (!image && req.body && req.body.messages && Array.isArray(req.body.messages) && req.body.messages[0]) {
-      const m0 = req.body.messages[0];
-      if (m0.image) image = m0.image.url || m0.image.base64 || image;
-      if (!image && (m0.url || m0.mediaUrl || m0.body)) image = m0.url || m0.mediaUrl || m0.body;
-    }
-    if (!image && req.body && (req.body.data || req.body.base64)) {
-      image = req.body.data || req.body.base64;
-    }
-
-    if (!number || (!message && !image)) {
-      console.log('[WEBHOOK] Missing required fields:', { number, hasMessage: !!message, hasImage: !!image });
-      return res.status(400).json({ success: false, message: 'Missing required fields (need number and message or image)' });
+    // Only text messages are supported in this controller (image handling removed)
+    if (!number || !message) {
+      console.log('[WEBHOOK] Missing required fields:', { number, hasMessage: !!message });
+      return res.status(400).json({ success: false, message: 'Missing required fields (need number and message)' });
     }
 
     // Normalize number to Indonesia style '62...'
@@ -77,8 +64,19 @@ const handleIncomingMessage = async (req, res) => {
       // ignore
     }
 
-  // persistence omitted: replace with real DB save when wiring
-  console.log('[WEBHOOK] persistence skipped (dataAduan):', dataAduan);
+    // Build minimal aduan object to store (persistence omitted)
+    const dataAduan = {
+      nomor: formattedNumber,
+      isi: parsedAnalysis.deskripsi || message,
+      pesanAsli: message,
+      waktu: new Date().toISOString(),
+      status: 'masuk',
+      kategori: (parsedAnalysis.kategori || 'tidak diketahui'),
+      deskripsi: parsedAnalysis.deskripsi || '',
+      levelurgensi: parsedAnalysis.levelurgensi || 'sedang'
+    };
+
+    console.log('[WEBHOOK] persistence skipped (dataAduan):', dataAduan);
 
     // send reply
     await sendWhatsAppMessage(formattedNumber, cleanReply || 'Terima kasih, laporan Anda sudah kami terima.');
