@@ -31,14 +31,6 @@ async function sendWhatsappNotif(phone, message) {
   }
 }
 
-module.exports = { sendWhatsappNotif };
-
-/**
- * Download media (binary) from Fonnte or a provided URL.
- * This helper attaches the FONNTE_API_KEY authorization header so
- * private/media endpoints can be fetched.
- * Returns an object { data: <Buffer>, contentType: <string> } on success.
- */
 async function downloadMedia(url) {
   if (!FONNTE_API_KEY) {
     // still try without header if API key missing
