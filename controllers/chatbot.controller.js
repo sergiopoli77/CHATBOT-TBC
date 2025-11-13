@@ -1,7 +1,5 @@
-const axios = require('axios');
 const { generateReplyFromGemini } = require('../services/aiService');
 const { sendWhatsappNotif } = require('../services/fonnteService');
-
 
 let sendWhatsAppMessage = async (phone, text) => {
   if (typeof sendWhatsappNotif === 'function') {
@@ -16,17 +14,13 @@ let sendWhatsAppMessage = async (phone, text) => {
   return null;
 };
 
-
+// Minimal webhook: receive text, forward to AI, and reply if AI returns text.
 const handleIncomingMessage = async (req, res) => {
   try {
-    console.log('🔵 [WEBHOOK] Incoming webhook at:', new Date().toISOString());
-
     const number = req.body && (req.body.sender || req.body.phone || req.body.from || req.body.pengirim);
     const message = req.body && (req.body.pesan || req.body.message || req.body.text || null);
 
-    // Only text messages are supported in this controller (image handling removed)
     if (!number || !message) {
-      console.log('[WEBHOOK] Missing required fields:', { number, hasMessage: !!message });
       return res.status(400).json({ success: false, message: 'Missing required fields (need number and message)' });
     }
 
@@ -36,58 +30,23 @@ const handleIncomingMessage = async (req, res) => {
     if (formattedNumber.startsWith('0')) formattedNumber = '62' + formattedNumber.slice(1);
     if (!formattedNumber.startsWith('62')) formattedNumber = '62' + formattedNumber;
 
+    const aiResult = await generateReplyFromGemini(message, formattedNumber, null, { autoSave: false });
 
-    const aiResult = await generateReplyFromGemini(message || '', formattedNumber || null, null, { autoSave: false });
-  let aiReply = '';
-  let parsedAnalysis = {};
-  if (typeof aiResult === 'string') aiReply = aiResult;
-    else if (typeof aiResult === 'object') {
-      aiReply = aiResult.reply || aiResult.deskripsi || '';
-      parsedAnalysis = aiResult;
+    let reply = null;
+    if (typeof aiResult === 'string') reply = aiResult;
+    else if (typeof aiResult === 'object') reply = aiResult.reply || aiResult.deskripsi || null;
+
+    if (reply) {
+      await sendWhatsAppMessage(formattedNumber, reply);
+      return res.status(200).json({ success: true, sent: true, reply });
     }
 
-    let cleanReply = aiReply || '';
-    try {
-      const firstBrace = aiReply.indexOf('{');
-      const lastBrace = aiReply.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        const maybeJson = aiReply.slice(firstBrace, lastBrace + 1);
-        try {
-          const obj = JSON.parse(maybeJson);
-          parsedAnalysis = { ...parsedAnalysis, ...obj };
-          cleanReply = (aiReply.slice(0, firstBrace) + aiReply.slice(lastBrace + 1)).trim();
-        } catch (e) {
-          // ignore
-        }
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    // Build minimal aduan object to store (persistence omitted)
-    const dataAduan = {
-      nomor: formattedNumber,
-      isi: parsedAnalysis.deskripsi || message,
-      pesanAsli: message,
-      waktu: new Date().toISOString(),
-      status: 'masuk',
-      kategori: (parsedAnalysis.kategori || 'tidak diketahui'),
-      deskripsi: parsedAnalysis.deskripsi || '',
-      levelurgensi: parsedAnalysis.levelurgensi || 'sedang'
-    };
-
-    console.log('[WEBHOOK] persistence skipped (dataAduan):', dataAduan);
-
-    // send reply
-    await sendWhatsAppMessage(formattedNumber, cleanReply || 'Terima kasih, laporan Anda sudah kami terima.');
-
-    return res.status(200).json({ success: true, message: 'Auto-reply sent', aiReply: cleanReply });
+    // AI returned nothing — do not send a fallback message.
+    return res.status(200).json({ success: true, sent: false, message: 'No reply from AI' });
   } catch (error) {
     console.error('[WEBHOOK] Error:', error && error.message ? error.message : error);
     return res.status(500).json({ success: false, message: 'Internal server error', error: error && error.message ? error.message : String(error) });
   }
 };
 
-module.exports = {
-  handleIncomingMessage
-};
+module.exports = { handleIncomingMessage };
