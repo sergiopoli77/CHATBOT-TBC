@@ -86,5 +86,14 @@ function onListening() {
   var bind = typeof addr === 'string'
     ? 'pipe ' + addr
     : 'port ' + addr.port;
+  // Log to console so `npm start` output clearly shows which port/interface is used
+  if (typeof addr === 'string') {
+    console.log('Server berjalan pada ' + bind);
+  } else {
+    // Show a clickable localhost URL (many terminals support Ctrl+Click on http:// links)
+    var url = 'http://localhost:' + addr.port;
+    console.log('Server berjalan pada ' + bind + ' - ' + url);
+  }
   debug('Listening on ' + bind);
 }
+
