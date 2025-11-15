@@ -8,6 +8,8 @@ app.use(express.json());
 
 // Mount webhook route under /webhook
 app.use('/webhook', webhookRouter);
+// Also accept legacy/api path used by some providers: /api/webhook
+app.use('/api/webhook', webhookRouter);
 
 // Basic error handler (returns JSON)
 app.use((err, req, res, next) => {

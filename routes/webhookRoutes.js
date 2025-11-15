@@ -4,7 +4,8 @@ const { handleIncomingMessage } = require('../controllers/chatbot.controller');
 
 // Add webhook routes
 // GET route for webhook verification
-router.get('/webhook', (req, res) => {
+// Mounted under /webhook in app.js, so expose root paths here ("/")
+router.get('/', (req, res) => {
     console.log('🔍 Webhook verification request received');
     res.status(200).json({
         status: true,
@@ -13,7 +14,7 @@ router.get('/webhook', (req, res) => {
 });
 
 // POST route for handling incoming messages
-router.post('/webhook', async (req, res, next) => {
+router.post('/', async (req, res, next) => {
     console.log('🔔 Webhook received at:', new Date().toISOString());
     console.log('📍 URL:', req.originalUrl);
     console.log('📝 Method:', req.method);
