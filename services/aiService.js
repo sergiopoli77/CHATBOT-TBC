@@ -64,7 +64,7 @@ async function generateReplyFromGemini(userMessage, senderName = null, options =
     const response = await postWithRetry(endpoint, requestBody, { headers: { 'Content-Type': 'application/json' } }, 3);
     const result = response.data;
     const aiReply = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-    return aiReply || 'Terima kasih. Mohon jelaskan lebih detail aduan atau pertanyaan Anda sehingga kami dapat membantu.';
+    return aiReply || 'Terima kasih. Mohon jelaskan lebih detail pertanyaan Anda sehingga kami dapat membantu.';
   } catch (error) {
     console.error('[GEMINI API ERROR] message=', error.message);
     if (error.response) {
