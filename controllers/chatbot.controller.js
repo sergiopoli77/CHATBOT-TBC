@@ -1,5 +1,6 @@
 const { generateReplyFromGemini } = require('../services/aiService');
 const { sendWhatsappNotif } = require('../services/fonnteService');
+const sessionContext = require('../utils/sessionContext');
 
 let sendWhatsAppMessage = async (phone, text) => {
   if (typeof sendWhatsappNotif === 'function') {
@@ -30,7 +31,34 @@ const handleIncomingMessage = async (req, res) => {
     if (formattedNumber.startsWith('0')) formattedNumber = '62' + formattedNumber.slice(1);
     if (!formattedNumber.startsWith('62')) formattedNumber = '62' + formattedNumber;
 
-    const aiResult = await generateReplyFromGemini(message, formattedNumber, null, { autoSave: false });
+    // check if user is telling their name (simple heuristics)
+    const nameSetRegex = /(?:^|\b)(?:nama saya|namaku|saya nama|aku nama)\s+(.{1,60})/i;
+    const whoAmIRegex = /(?:^|\b)(?:siapa nama saya|siapa namaku)\b/i;
+
+    const nameSetMatch = message.match(nameSetRegex);
+    if (nameSetMatch) {
+      const givenName = nameSetMatch[1].trim();
+      if (givenName) {
+        sessionContext.setUserName(formattedNumber, givenName);
+        const replyText = `Oh begitu ya. Baik, saya ingat nama kamu sebagai ${givenName}. Kalau butuh saya panggil kamu dengan nama itu, bilang saja ya.`;
+        await sendWhatsAppMessage(formattedNumber, replyText);
+        return res.status(200).json({ success: true, sent: true, reply: replyText });
+      }
+    }
+
+    // user asking what their name is
+    if (whoAmIRegex.test(message)) {
+      const stored = sessionContext.getUserName(formattedNumber);
+      const replyText = stored ? `Namamu tercatat sebagai ${stored}.` : 'Sepertinya saya belum tahu nama kamu. Kamu bisa bilang "nama saya [namamu]" supaya saya ingat.';
+      await sendWhatsAppMessage(formattedNumber, replyText);
+      return res.status(200).json({ success: true, sent: true, reply: replyText });
+    }
+
+    // retrieve stored name (if any) to pass to AI as senderName
+    const storedName = sessionContext.getUserName(formattedNumber);
+    const senderNameForAI = storedName || formattedNumber;
+
+    const aiResult = await generateReplyFromGemini(message, senderNameForAI, null, { autoSave: false });
 
     let reply = null;
     if (typeof aiResult === 'string') reply = aiResult;
